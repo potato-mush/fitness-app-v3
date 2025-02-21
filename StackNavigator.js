@@ -9,12 +9,14 @@ import RestScreen from './screens/RestScreen';
 import AchievementsScreen from './screens/AchievementsScreen'; // Import AchievementsScreen
 import AvatarScreen from './screens/AvatarScreen'; // Import AchievementsScreen
 import RewardsScreen from './screens/RewardsScreen';
+import LoginScreen from './screens/LoginScreen';
 
 const StackNavigator = () => {
   const Stack = createNativeStackNavigator();
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen options={{headerShown: false}} name="Login" component={LoginScreen} />
         <Stack.Screen options={{headerShown: false}} name="Home" component={HomeScreen} />
         <Stack.Screen options={{headerShown: false}} name="Training" component={TrainingScreen} />
         <Stack.Screen options={{headerShown: false}} name="Settings" component={SettingsScreen} />

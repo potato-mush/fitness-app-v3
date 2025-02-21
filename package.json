@@ -13,12 +13,13 @@
     "@firebase/app": "^0.9.29",
     "@firebase/auth": "^1.9.0",
     "@firebase/firestore": "^4.7.8",
-    "@react-native-async-storage/async-storage": "^1.24.0",
+    "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native/assets-registry": "^0.76.1",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
-    "expo": "^52.0.35",
+    "expo": "~52.0.36",
+    "expo-barcode-scanner": "^13.0.1",
     "expo-linear-gradient": "~14.0.2",
     "expo-status-bar": "~2.0.1",
     "firebase": "^9.23.0",
@@ -37,9 +38,13 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "@babel/plugin-proposal-export-namespace-from": "^7.18.9"
+    "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
+    "react-native-dotenv": "^3.4.11"
   },
   "private": true,
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "expo": {
     "web": {
       "bundler": "metro"

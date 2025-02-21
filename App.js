@@ -4,25 +4,19 @@ import { FitnessContext } from './Context';
 import StackNavigator from './StackNavigator';
 import { StatusBar } from 'expo-status-bar';
 import { auth } from './firebase/config';
-import { initializeAuth } from './services/authService';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const initApp = async () => {
-      try {
-        await initializeAuth();
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error initializing app:', error);
-        setError(error.message);
-        setIsLoading(false);
-      }
-    };
+    // Simple initialization without auto-login
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
 
-    initApp();
+    return () => clearTimeout(timer);
   }, []);
 
   if (isLoading) {
