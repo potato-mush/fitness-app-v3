@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Dimensions } from 'react-native';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
+import { Camera } from 'expo-camera';
 import { auth } from '../firebase/config';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,7 +15,7 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
     (async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
     })();
   }, []);
@@ -30,11 +30,7 @@ export default function LoginScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  const handleBarCodeScanned = ({ type, data }) => {
-    if (type !== BarCodeScanner.Constants.BarCodeType.qr) {
-      Alert.alert('Invalid Code', 'Please scan a valid QR code');
-      return;
-    }
+  const handleBarCodeScanned = ({ data }) => {
     setScanned(true);
     setUserId(data);
     setShowScanner(false);
@@ -55,7 +51,41 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-  const QRframeSVG = () => (
+  const LoginForm = () => (
+    <View style={styles.formContainer}>
+      <Text style={styles.title}>Login</Text>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.inputWithIcon}
+          placeholder="User ID"
+          value={userId}
+          onChangeText={setUserId}
+          editable={false}
+        />
+        <TouchableOpacity
+          style={styles.qrIconButton}
+          onPress={() => {
+            setScanned(false);
+            setShowScanner(true);
+          }}
+        >
+          <MaterialCommunityIcons name="qrcode-scan" size={24} color="#666" />
+        </TouchableOpacity>
+      </View>
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+      <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+        <Text style={styles.buttonText}>Login</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const QRFrame = () => (
     <View style={styles.qrFrame}>
       <View style={styles.qrCorner} />
       <View style={[styles.qrCorner, { right: 0 }]} />
@@ -64,79 +94,94 @@ export default function LoginScreen({ navigation }) {
     </View>
   );
 
-  if (hasPermission === null) {
-    return <Text>Requesting camera permission</Text>;
-  }
-  if (hasPermission === false) {
-    return <Text>No access to camera</Text>;
+  const CameraView = () => {
+    if (Platform.OS === 'web' && !('mediaDevices' in navigator)) {
+      return (
+        <View style={styles.container}>
+          <Text>Camera is not available in this browser</Text>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => setShowScanner(false)}
+          >
+            <Text style={styles.buttonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+  
+    if (!Camera || !Camera.Constants || !Camera.Constants.BarCodeType) {
+      return (
+        <View style={styles.container}>
+          <Text>Camera module is not available</Text>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => setShowScanner(false)}
+          >
+            <Text style={styles.buttonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+  
+    return (
+      <View style={styles.scannerContainer}>
+        <View style={styles.cameraWrapper}>
+          <Camera
+            style={styles.camera}
+            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+            barCodeScannerSettings={{
+              barCodeTypes: [Camera.Constants.BarCodeType.qr],
+            }}
+          >
+            <View style={styles.overlayContainer}>
+              <QRFrame />
+              <View style={styles.scannerControls}>
+                {Platform.OS !== 'web' && (
+                  <TouchableOpacity
+                    style={styles.torchButton}
+                    onPress={() => setTorch(!torch)}
+                  >
+                    <Ionicons 
+                      name={torch ? "flashlight" : "flashlight-outline"} 
+                      size={24} 
+                      color="white" 
+                    />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setShowScanner(false);
+                    setTorch(false);
+                  }}
+                >
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Camera>
+        </View>
+      </View>
+    );
+  };
+
+  if (!hasPermission) {
+    return (
+      <View style={styles.container}>
+        <Text>Camera permission not granted</Text>
+        <TouchableOpacity
+          style={[styles.loginButton, { marginTop: 20 }]}
+          onPress={() => setShowScanner(false)}
+        >
+          <Text style={styles.buttonText}>Back to Login</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      {showScanner ? (
-        <View style={styles.scannerContainer}>
-          <BarCodeScanner
-            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-            style={StyleSheet.absoluteFillObject}
-            barCodeTypes={[BarCodeScanner.Constants.BarCodeType.qr]}
-            flashMode={torch ? 'torch' : 'off'}
-          />
-          <QRframeSVG />
-          <View style={styles.scannerControls}>
-            <TouchableOpacity
-              style={styles.torchButton}
-              onPress={() => setTorch(!torch)}
-            >
-              <Ionicons 
-                name={torch ? "flashlight" : "flashlight-outline"} 
-                size={24} 
-                color="white" 
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setShowScanner(false);
-                setTorch(false);
-              }}
-            >
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <>
-          <Text style={styles.title}>Login</Text>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.inputWithIcon}
-              placeholder="User ID"
-              value={userId}
-              onChangeText={setUserId}
-              editable={false}
-            />
-            <TouchableOpacity
-              style={styles.qrIconButton}
-              onPress={() => {
-                setScanned(false);
-                setShowScanner(true);
-              }}
-            >
-              <MaterialCommunityIcons name="qrcode-scan" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.buttonText}>Login</Text>
-          </TouchableOpacity>
-        </>
-      )}
+      {showScanner ? <CameraView /> : <LoginForm />}
     </View>
   );
 }
@@ -240,4 +285,28 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 50,
   },
+  cameraWrapper: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden'
+  },
+  camera: {
+    width: '100%',
+    height: '100%'
+  },
+  cameraContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  overlayContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  formContainer: {
+    width: '100%',
+    alignItems: 'center',
+  }
 });
