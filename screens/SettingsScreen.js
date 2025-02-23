@@ -1,14 +1,9 @@
 import React, { useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Linking,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import BottomNavigation from "./BottomNavigation"; // Import BottomNavigation component
 import { useNavigation } from "@react-navigation/native";
+import { auth } from '../firebase/config';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
@@ -20,6 +15,15 @@ const SettingsScreen = () => {
 
   const openLink = (url) => {
     Linking.openURL(url);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await auth.signOut();
+      navigation.replace('Login'); // Navigate to Login screen after signing out
+    } catch (error) {
+      Alert.alert('Error', 'Failed to sign out');
+    }
   };
 
   return (
@@ -48,6 +52,11 @@ const SettingsScreen = () => {
           <Ionicons name="document-text" size={24} color="#15B392" />
           <Text style={styles.text}>Privacy Policy</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={handleSignOut}>
+          <Ionicons name="log-out" size={24} color="#f44336" />
+          <Text style={[styles.text, styles.signOutText]}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
       <BottomNavigation /> {/* Add BottomNavigation component here */}
     </View>
@@ -73,6 +82,9 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 18,
     marginLeft: 15,
+  },
+  signOutText: {
+    color: '#f44336',
   },
 });
 

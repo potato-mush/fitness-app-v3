@@ -12,14 +12,18 @@ import FitnessCards from "../components/FitnessCards";
 import { FitnessItems } from "../Context";
 import BottomNavigation from "./BottomNavigation";
 import { Calendar } from "react-native-calendars";
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
 import { getUserStats, updateUserProgress, getUserAchievements, getUserMilestones } from '../services/userProgressService';
 import { initializeAuth } from '../services/authService';
 import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect } from '@react-navigation/native';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 
-const HomeScreen = () => {
-  const navigation = useNavigation();
+const HomeScreen = ({ route, navigation }) => {
+  // Add default values for route.params
+  const { userId = auth.currentUser?.uid, userStats = {} } = route.params || {};
+  
+  const [stats, setStats] = useState(userStats);
   const [showIcon, setShowIcon] = useState(false);
   const { calories, minutes, workout, setWorkoutHistory } =
     useContext(FitnessItems);
@@ -50,6 +54,33 @@ const HomeScreen = () => {
 
     initialize();
   }, []);
+
+  useEffect(() => {
+    // Set up real-time listener for user stats updates
+    const unsubscribe = onSnapshot(doc(db, 'users', userId), (doc) => {
+      if (doc.exists()) {
+        setStats(doc.data());
+      }
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  // Add check for userId
+  useEffect(() => {
+    if (!userId && auth.currentUser) {
+      // If no userId provided but user is authenticated, use current user's ID
+      setStats({});
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      getDoc(userDocRef).then(docSnap => {
+        if (docSnap.exists()) {
+          setStats(docSnap.data());
+        }
+      }).catch(error => {
+        console.error('Error fetching user data:', error);
+      });
+    }
+  }, [userId]);
 
   const fetchAllData = async () => {
     if (auth.currentUser) {

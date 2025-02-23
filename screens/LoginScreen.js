@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Camera } from 'expo-camera';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function LoginScreen({ navigation }) {
@@ -15,15 +16,37 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
     (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
+      try {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        console.log('Camera permission status:', status); // Debug log
+        setHasPermission(status === 'granted');
+        
+        // If permission was denied, try requesting again
+        if (status !== 'granted') {
+          const { status: newStatus } = await Camera.requestCameraPermissionsAsync();
+          setHasPermission(newStatus === 'granted');
+        }
+      } catch (error) {
+        console.log('Error requesting camera permission:', error);
+        setHasPermission(true); // Fallback to true if there's an error checking
+      }
     })();
   }, []);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user && user.email) {
-        navigation.replace('Home');
+        // Get user data before navigating
+        getDoc(doc(db, 'users', user.uid)).then(userDoc => {
+          const userData = userDoc.exists() ? userDoc.data() : {};
+          navigation.replace('Home', {
+            userId: user.uid,
+            userStats: userData
+          });
+        }).catch(error => {
+          console.error('Error fetching user data:', error);
+          navigation.replace('Home'); // Navigate anyway, HomeScreen will handle missing data
+        });
       }
     });
 
@@ -42,48 +65,83 @@ export default function LoginScreen({ navigation }) {
         Alert.alert('Error', 'Please fill in all fields');
         return;
       }
+
+      // Get user document directly using the userId (UID)
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (!userDoc.exists()) {
+        Alert.alert('Error', 'User not found');
+        return;
+      }
+
+      const userData = userDoc.data();
       
-      const email = `${userId}@yourdomain.com`; // Convert userId to email format
-      await signInWithEmailAndPassword(auth, email, password);
-      navigation.replace('Home');
+      // Authenticate with email and password
+      const userCredential = await signInWithEmailAndPassword(auth, userData.email, password);
+      
+      // Navigate to Home screen with user data
+      navigation.replace('Home', {
+        userId: userId,
+        userStats: userData
+      });
+      
     } catch (error) {
-      Alert.alert('Error', error.message);
+      console.error('Login error:', error);
+      Alert.alert(
+        'Login Error',
+        'Invalid user ID or password. Please try again.'
+      );
     }
   };
 
-  const LoginForm = () => (
-    <View style={styles.formContainer}>
-      <Text style={styles.title}>Login</Text>
-      <View style={styles.inputContainer}>
+  const LoginForm = () => {
+    const [localUserId, setLocalUserId] = useState(userId);
+    const [localPassword, setLocalPassword] = useState('');
+
+    const handleLocalLogin = () => {
+      setUserId(localUserId);
+      setPassword(localPassword);
+      handleLogin();
+    };
+
+    return (
+      <View style={styles.formContainer}>
+        <Text style={styles.title}>Login</Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.inputWithIcon}
+            placeholder="Email"
+            value={localUserId}
+            onChangeText={setLocalUserId}
+            editable={true}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+          />
+          <TouchableOpacity
+            style={styles.qrIconButton}
+            onPress={() => {
+              setScanned(false);
+              setShowScanner(true);
+            }}
+          >
+            <MaterialCommunityIcons name="qrcode-scan" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
         <TextInput
-          style={styles.inputWithIcon}
-          placeholder="User ID"
-          value={userId}
-          onChangeText={setUserId}
-          editable={false}
+          style={styles.input}
+          placeholder="Password"
+          value={localPassword}
+          onChangeText={setLocalPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
         />
-        <TouchableOpacity
-          style={styles.qrIconButton}
-          onPress={() => {
-            setScanned(false);
-            setShowScanner(true);
-          }}
-        >
-          <MaterialCommunityIcons name="qrcode-scan" size={24} color="#666" />
+        <TouchableOpacity style={styles.loginButton} onPress={handleLocalLogin}>
+          <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
       </View>
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Login</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const QRFrame = () => (
     <View style={styles.qrFrame}>
@@ -165,16 +223,10 @@ export default function LoginScreen({ navigation }) {
     );
   };
 
-  if (!hasPermission) {
+  if (hasPermission === null) {
     return (
       <View style={styles.container}>
-        <Text>Camera permission not granted</Text>
-        <TouchableOpacity
-          style={[styles.loginButton, { marginTop: 20 }]}
-          onPress={() => setShowScanner(false)}
-        >
-          <Text style={styles.buttonText}>Back to Login</Text>
-        </TouchableOpacity>
+        <Text>Requesting camera permission...</Text>
       </View>
     );
   }
